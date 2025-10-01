@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Arah Kiblat Akurat</title>
+  <style>
+    body { font-family: Arial, sans-serif; text-align: center; padding: 30px; }
+    h1 { color: #2c3e50; }
+    #kiblat-arrow {
+      font-size: 100px;
+      transition: transform 0.3s ease;
+    }
+    .info {
+      margin-top: 20px;
+      font-size: 18px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Penentu Arah Kiblat</h1>
+  <p>Gerakkan HP untuk kalibrasi kompas, lalu lihat panah arah kiblat.</p>
+  <div id="kiblat-arrow">🧭</div>
+  <div class="info" id="info"></div>
+
+  <script>
+    // Koordinat Ka'bah
+    const kaabaLat = 21.4225 * Math.PI / 180;
+    const kaabaLng = 39.8262 * Math.PI / 180;
+
+    let kiblatAzimuth = null;
+
+    // Ambil lokasi user
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(pos => {
+        let lat = pos.coords.latitude * Math.PI / 180;
+        let lng = pos.coords.longitude * Math.PI / 180;
+
+        // Rumus azimuth kiblat
+        let dLng = kaabaLng - lng;
+        let y = Math.sin(dLng);
+        let x = Math.cos(lat) * Math.tan(kaabaLat) - Math.sin(lat) * Math.cos(dLng);
+        kiblatAzimuth = Math.atan2(y, x) * 180 / Math.PI;
+        if (kiblatAzimuth < 0) kiblatAzimuth += 360;
+
+        document.getElementById("info").innerHTML = 
+          "Lokasi Anda: " + pos.coords.latitude.toFixed(5) + ", " + pos.coords.longitude.toFixed(5) +
+          "<br>Arah Kiblat: " + kiblatAzimuth.toFixed(2) + "° dari Utara";
+
+      }, () => {
+        alert("Gagal mengambil lokasi. Harap aktifkan GPS.");
+      });
+    } else {
+      alert("Browser tidak mendukung GPS.");
+    }
+
+    // Gunakan sensor kompas untuk memutar panah
+    if (window.DeviceOrientationEvent) {
+      window.addEventListener("deviceorientationabsolute", event => {
+        if (kiblatAzimuth !== null) {
+          let heading = event.alpha; // arah HP dari utara
+          if (typeof event.webkitCompassHeading !== "undefined") {
+            heading = event.webkitCompassHeading; // untuk iOS
+          }
+          let angle = kiblatAzimuth - heading;
+          document.getElementById("kiblat-arrow").style.transform = `rotate(${angle}deg)`;
+        }
+      }, true);
+    } else {
+      alert("HP Anda tidak mendukung sensor kompas.");
+    }
+  </script>
+</body>
+</html>
