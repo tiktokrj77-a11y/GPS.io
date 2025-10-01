@@ -3,72 +3,96 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Arah Kiblat Akurat</title>
+  <title>Arah Kiblat Profesional</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
   <style>
-    body { font-family: Arial, sans-serif; text-align: center; padding: 30px; }
-    h1 { color: #2c3e50; }
-    #kiblat-arrow {
-      font-size: 100px;
-      transition: transform 0.3s ease;
-    }
-    .info {
-      margin-top: 20px;
-      font-size: 18px;
-    }
+    body { font-family: 'Inter', sans-serif; margin:0; padding:0; background:#f3f6fb; color:#111827; }
+    header { background:#0a3d62; color:white; padding:20px; text-align:center; }
+    header h1 { margin:0; font-size:1.8rem; }
+    #map { height: 400px; margin:15px; border-radius:12px; }
+    #arrow { font-size:100px; transition: transform 0.3s ease; margin:20px auto; display:block; }
+    #info { text-align:center; font-size:1.1rem; margin:10px; }
+    .degree { font-weight:700; font-size:1.4rem; color:#0a3d62; }
+    .error { color:red; }
+    footer { text-align:center; font-size:0.9rem; color:#6b7280; padding:10px; }
   </style>
 </head>
 <body>
-  <h1>Penentu Arah Kiblat</h1>
-  <p>Gerakkan HP untuk kalibrasi kompas, lalu lihat panah arah kiblat.</p>
-  <div id="kiblat-arrow">🧭</div>
-  <div class="info" id="info"></div>
 
+  <header>
+    <h1>Arah Kiblat Profesional</h1>
+    <p>GPS + Kompas + Peta → Hasil akurat</p>
+  </header>
+
+  <div id="map"></div>
+  <div id="arrow">🧭</div>
+  <div id="info">Menunggu lokasi...</div>
+
+  <footer>© 2025 - Arah Kiblat Akurat & Profesional</footer>
+
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script>
-    // Koordinat Ka'bah
-    const kaabaLat = 21.4225 * Math.PI / 180;
-    const kaabaLng = 39.8262 * Math.PI / 180;
-
+    const kaaba = [21.4225, 39.8262]; // Ka'bah
     let kiblatAzimuth = null;
+    let map, userMarker, line;
 
-    // Ambil lokasi user
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(pos => {
-        let lat = pos.coords.latitude * Math.PI / 180;
-        let lng = pos.coords.longitude * Math.PI / 180;
-
-        // Rumus azimuth kiblat
-        let dLng = kaabaLng - lng;
-        let y = Math.sin(dLng);
-        let x = Math.cos(lat) * Math.tan(kaabaLat) - Math.sin(lat) * Math.cos(dLng);
-        kiblatAzimuth = Math.atan2(y, x) * 180 / Math.PI;
-        if (kiblatAzimuth < 0) kiblatAzimuth += 360;
-
-        document.getElementById("info").innerHTML = 
-          "Lokasi Anda: " + pos.coords.latitude.toFixed(5) + ", " + pos.coords.longitude.toFixed(5) +
-          "<br>Arah Kiblat: " + kiblatAzimuth.toFixed(2) + "° dari Utara";
-
-      }, () => {
-        alert("Gagal mengambil lokasi. Harap aktifkan GPS.");
-      });
-    } else {
-      alert("Browser tidak mendukung GPS.");
+    // Konversi derajat ke arah mata angin
+    function getCompassDirection(angle) {
+      const directions = ["Utara","Timur Laut","Timur","Tenggara","Selatan","Barat Daya","Barat","Barat Laut"];
+      return directions[Math.round(angle/45)%8];
     }
 
-    // Gunakan sensor kompas untuk memutar panah
-    if (window.DeviceOrientationEvent) {
-      window.addEventListener("deviceorientationabsolute", event => {
-        if (kiblatAzimuth !== null) {
-          let heading = event.alpha; // arah HP dari utara
-          if (typeof event.webkitCompassHeading !== "undefined") {
-            heading = event.webkitCompassHeading; // untuk iOS
-          }
+    function hitungArah(lat, lng){
+      let userLat = lat * Math.PI / 180;
+      let userLng = lng * Math.PI / 180;
+      let kaabaLat = kaaba[0] * Math.PI / 180;
+      let kaabaLng = kaaba[1] * Math.PI / 180;
+      let dLng = kaabaLng - userLng;
+      let y = Math.sin(dLng);
+      let x = Math.cos(userLat)*Math.tan(kaabaLat)-Math.sin(userLat)*Math.cos(dLng);
+      let azimuth = Math.atan2(y, x) * 180 / Math.PI;
+      if(azimuth<0) azimuth+=360;
+      return azimuth;
+    }
+
+    function tampilMap(lat, lng){
+      map = L.map('map').setView([lat, lng], 13);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'© OpenStreetMap' }).addTo(map);
+      userMarker = L.marker([lat,lng]).addTo(map).bindPopup("Lokasi Anda").openPopup();
+      L.marker(kaaba).addTo(map).bindPopup("Ka'bah");
+      line = L.polyline([[lat,lng],kaaba],{color:'red',weight:3,dashArray:'5,10'}).addTo(map);
+    }
+
+    if(navigator.geolocation){
+      navigator.geolocation.getCurrentPosition(pos=>{
+        let lat = pos.coords.latitude;
+        let lng = pos.coords.longitude;
+        kiblatAzimuth = hitungArah(lat,lng);
+
+        document.getElementById("info").innerHTML =
+          `Lokasi: ${lat.toFixed(5)}, ${lng.toFixed(5)}<br>`+
+          `Arah Kiblat: <span class="degree">${kiblatAzimuth.toFixed(2)}°</span> (${getCompassDirection(kiblatAzimuth)})`;
+
+        tampilMap(lat,lng);
+      },err=>{
+        document.getElementById("info").innerHTML = `<span class="error">Gagal ambil lokasi: ${err.message}</span>`;
+      });
+    }else{
+      document.getElementById("info").innerHTML="<span class='error'>Browser tidak mendukung GPS</span>";
+    }
+
+    // Sensor kompas
+    if(window.DeviceOrientationEvent){
+      window.addEventListener("deviceorientationabsolute", event=>{
+        if(kiblatAzimuth!==null){
+          let heading = event.alpha;
+          if(typeof event.webkitCompassHeading!=="undefined") heading=event.webkitCompassHeading;
           let angle = kiblatAzimuth - heading;
-          document.getElementById("kiblat-arrow").style.transform = `rotate(${angle}deg)`;
+          document.getElementById("arrow").style.transform=`rotate(${angle}deg)`;
         }
-      }, true);
-    } else {
-      alert("HP Anda tidak mendukung sensor kompas.");
+      },true);
     }
   </script>
+
 </body>
 </html>
